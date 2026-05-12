@@ -1,17 +1,18 @@
-// NOTE: Put your Firebase Config here
-const firebaseConfig = {
-  apiKey: "AIzaSyAWPT4snZ_LRh6eauD9QrZjuIh-RTt-puQ",
-  authDomain: "nexchat-ed18f.firebaseapp.com",
-  projectId: "nexchat-ed18f",
-  storageBucket: "nexchat-ed18f.firebasestorage.app",
-  messagingSenderId: "382218328496",
-  appId: "1:382218328496:web:51c0038c09f2e494101e75"
-};
+let firebaseConfig = {};
 
-// Initialize Firebase if config is present
-if (firebaseConfig.apiKey) {
-    firebase.initializeApp(firebaseConfig);
+async function initializeAppConfig() {
+    try {
+        const response = await fetch('/api/config/firebase');
+        firebaseConfig = await response.json();
+        
+        if (firebaseConfig && firebaseConfig.apiKey) {
+            firebase.initializeApp(firebaseConfig);
+        }
+    } catch (err) {
+        console.error('Failed to load Firebase config:', err);
+    }
 }
+
 
 class NexChatApp {
     constructor() {
@@ -3890,6 +3891,7 @@ class NexChatApp {
 
 // Initialize Application
 let nexChat;
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+    await initializeAppConfig();
     nexChat = new NexChatApp();
 });
