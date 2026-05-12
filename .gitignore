@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+
+# Environment variables
+.env
+
+# Uploads and temporary files
+uploads/*
+!uploads/.gitkeep
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+logs/
+*.log
+
+# Editor/OS specific
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Build/Dist (if applicable)
+dist/
+build/

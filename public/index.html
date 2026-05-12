@@ -1,0 +1,775 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NexChat - Advanced Messaging</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <!-- Main CSS -->
+    <link rel="stylesheet" href="style.css">
+    
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-storage-compat.js"></script>
+    
+    <!-- Emoji Picker Element -->
+    <script type="module" src="https://cdn.jsdelivr.net/npm/emoji-picker-element@1.18.1/index.js"></script>
+</head>
+<body data-theme="dark">
+    <!-- Toast Notification Container -->
+    <div id="toastContainer" class="toast-container"></div>
+
+    <div id="app" class="app-container">
+        
+        <!-- Auth Screen (Glassmorphism) -->
+        <div id="authScreen" class="screen auth-screen active">
+            <div class="auth-glass-card">
+                <div class="brand">
+                    <div class="logo-icon"><i class="fas fa-comment-dots"></i></div>
+                    <h1>NexChat</h1>
+                    <p>Connect securely with the world.</p>
+                </div>
+
+                <!-- Login Form -->
+                <form id="loginForm" class="auth-form active">
+                    <div class="input-group">
+                        <i class="fas fa-envelope"></i>
+                        <input type="email" id="loginEmail" placeholder="Email Address" required autocomplete="email">
+                    </div>
+                    <div class="input-group password-group">
+                        <i class="fas fa-lock"></i>
+                        <input type="password" id="loginPassword" placeholder="Password" required autocomplete="current-password">
+                        <i class="fas fa-eye toggle-password" onclick="nexChat.togglePasswordVisibility('loginPassword', this)"></i>
+                    </div>
+                    <div class="auth-extra-links">
+                        <span id="forgotPasswordLink" class="text-link">Forgot Password?</span>
+                    </div>
+                    <button type="submit" class="btn-primary">Sign In</button>
+                    
+                    <div class="divider"><span>OR</span></div>
+                    
+                    <button type="button" id="googleLoginBtn" class="btn-google">
+                        <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google">
+                        Sign in with Google
+                    </button>
+                    
+                    <p class="auth-switch">Don't have an account? <span id="showRegister">Sign Up</span></p>
+                </form>
+
+                <!-- Register Form -->
+                <form id="registerForm" class="auth-form hidden">
+                    <div class="input-group">
+                        <i class="fas fa-user"></i>
+                        <input type="text" id="regUsername" placeholder="Username" required autocomplete="username">
+                    </div>
+                    <div class="input-group">
+                        <i class="fas fa-user"></i>
+                        <input type="email" id="regEmail" placeholder="Email Address" required autocomplete="email">
+                    </div>
+                    <div class="input-group password-group">
+                        <i class="fas fa-lock"></i>
+                        <input type="password" id="regPassword" placeholder="Password (Min 8 characters)" required oninput="nexChat.checkPasswordStrength(this.value)" autocomplete="new-password">
+                        <i class="fas fa-eye toggle-password" onclick="nexChat.togglePasswordVisibility('regPassword', this)"></i>
+                    </div>
+                    <div id="pwStrength" class="pw-strength-meter">
+                        <div class="pw-bar"></div>
+                        <span id="pwStrengthText">Password Security</span>
+                    </div>
+                    <button type="submit" class="btn-primary">Create Account</button>
+                    
+                    <p class="auth-switch">Already have an account? <span id="showLogin">Sign In</span></p>
+                </form>
+
+                <div id="authError" class="auth-error hidden"></div>
+            </div>
+            
+            <!-- Animated Background Blobs -->
+            <div class="blob blob-1"></div>
+            <div class="blob blob-2"></div>
+            <div class="blob blob-3"></div>
+        </div>
+
+        <!-- Main Workspace -->
+        <div id="mainWorkspace" class="screen workspace hidden">
+            <!-- App Navigation Sidebar (Leftmost) — Desktop Only -->
+            <nav class="app-nav-sidebar">
+                <div class="nav-top">
+                    <button class="nav-item active" title="Chats" onclick="nexChat.switchNavTab('chats', this)"><i class="fas fa-comment-dots"></i></button>
+                    <button class="nav-item" title="Calls" onclick="nexChat.switchNavTab('calls', this)"><i class="fas fa-phone-alt"></i></button>
+                </div>
+                <div class="nav-bottom">
+                    <button class="nav-item" id="starredMsgsBtnNav" title="Starred Messages"><i class="fas fa-star"></i></button>
+                    <button class="nav-item" id="themeToggleNav" title="Toggle Theme"><i class="fas fa-moon"></i></button>
+                    <button class="nav-item" id="logoutBtnNav" title="Logout"><i class="fas fa-sign-out-alt"></i></button>
+                    <button class="nav-item user-avatar" title="Profile" onclick="nexChat.openProfileSettings()"><img id="sidebarUserAvatar" src="https://ui-avatars.com/api/?name=User&background=random" alt="User"></button>
+                </div>
+            </nav>
+
+            <!-- Mobile Top Header Bar -->
+            <div class="mobile-top-header" id="mobileTopHeader">
+                <div class="mobile-top-left">
+                    <span class="mobile-app-title">NexChat</span>
+                </div>
+                <div class="mobile-top-right">
+                    <button class="mobile-top-btn" id="mobileMenuBtn" onclick="nexChat.toggleMobileMenu()" title="Menu">
+                        <i class="fas fa-ellipsis-v"></i>
+                    </button>
+                </div>
+                <!-- Three-dot Dropdown -->
+                <div class="mobile-dropdown hidden" id="mobileDropdown">
+                    <div class="mobile-dropdown-item" id="mobileStarredBtn">
+                        <i class="fas fa-star" style="color:#eab308;"></i>
+                        <span>Starred Messages</span>
+                    </div>
+                    <div class="mobile-dropdown-item" id="mobileThemeBtn">
+                        <i class="fas fa-moon" id="mobileThemeIcon"></i>
+                        <span id="mobileThemeLabel">Dark Mode</span>
+                    </div>
+                    <div class="mobile-dropdown-divider"></div>
+                    <div class="mobile-dropdown-item danger" id="mobileLogoutBtn">
+                        <i class="fas fa-sign-out-alt"></i>
+                        <span>Logout</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sidebar Panel (Contacts) -->
+            <aside class="sidebar">
+                <!-- Desktop Sidebar Header (hidden on mobile) -->
+                <header class="sidebar-header desktop-only">
+                    <div class="user-profile" onclick="nexChat.openProfileSettings()">
+                        <img id="myAvatar" src="https://ui-avatars.com/api/?name=User&background=random" alt="Avatar">
+                        <div class="user-info">
+                            <h3 id="myUsername">Loading...</h3>
+                            <span class="status online">Online</span>
+                        </div>
+                    </div>
+                </header>
+
+                <div class="search-box">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="searchInput" placeholder="Search or start new chat">
+                </div>
+
+                <div class="chat-filters" id="chatFilters">
+                    <button class="filter-pill active" onclick="nexChat.filterChats('all', this)">All</button>
+                    <button class="filter-pill" onclick="nexChat.filterChats('unread', this)">Unread</button>
+                    <button class="filter-pill" onclick="nexChat.filterChats('favourites', this)">Favourites</button>
+                </div>
+                <h3 id="sidebarCallsHeading" class="hidden" style="padding: 10px 25px; margin: 0; font-size: 1.2rem; font-weight: 700; color: var(--text-main);">Calls</h3>
+
+
+                <div id="section-chats" class="sidebar-section active">
+                    <div class="contacts-container">
+                        <h4 class="section-title">Active Contacts</h4>
+                        <div id="contactsList" class="contacts-list">
+                            <!-- Contacts dynamically loaded here -->
+                        </div>
+                    </div>
+                </div>
+
+                <div id="section-calls" class="sidebar-section hidden">
+                    <div class="call-actions-hub" style="padding: 15px 25px;">
+                        <button class="call-action-card" onclick="nexChat.generateCallLink()" style="background: linear-gradient(135deg, var(--accent), var(--accent-hover));">
+                            <div class="action-icon"><i class="fas fa-link"></i></div>
+                            <div class="action-info">
+                                <strong>Create Call Link</strong>
+                                <span>Share a link with anyone</span>
+                            </div>
+                        </button>
+                        <div class="call-grid-actions" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px;">
+                            <button class="call-mini-action" onclick="nexChat.showNewCallModal()">
+                                <i class="fas fa-plus"></i>
+                                <span>New Call</span>
+                            </button>
+                            <button class="call-mini-action" onclick="nexChat.openScheduleCallModal()">
+                                <i class="fas fa-calendar-plus"></i>
+                                <span>Schedule</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="contacts-container">
+                        <h4 class="section-title">Recent Calls</h4>
+                        <div id="callsList" class="contacts-list">
+                            <!-- Calls dynamically loaded here -->
+                        </div>
+                    </div>
+                </div>
+            </aside>
+            <div class="sidebar-resizer" id="sidebarResizer"></div>
+
+            <!-- Main Chat Area -->
+            <main class="chat-area" id="chatArea">
+                <!-- Welcome Empty State -->
+                <div id="welcomeScreen" class="welcome-state active">
+                    <div class="glass-icon"><i class="fas fa-paper-plane"></i></div>
+                    <h2>Welcome to NexChat</h2>
+                    <p>Select a contact to start messaging.</p>
+                </div>
+
+                <!-- Active Chat Container -->
+                <div id="activeChat" class="active-chat hidden">
+                    <header class="chat-header">
+                        <div class="chat-partner">
+                            <button class="mobile-back-btn" id="mobileBackBtn"><i class="fas fa-arrow-left"></i></button>
+                            <img id="partnerAvatar" src="https://ui-avatars.com/api/?name=Contact&background=random" alt="Avatar" style="cursor:pointer" onclick="nexChat.showContactInfo()">
+                            <div class="partner-details">
+                                <h3 id="partnerName">Contact Name</h3>
+                                <div class="status-container">
+                                    <span id="partnerStatus" class="partner-status"></span>
+                                    <div id="partnerTyping" class="typing-status hidden">
+                                        <div class="typing-dots">
+                                            <div class="typing-dot"></div>
+                                            <div class="typing-dot"></div>
+                                            <div class="typing-dot"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="chat-actions">
+                            <button id="msgFavoriteBtn" title="Favorite Chat"><i class="far fa-star"></i></button>
+                            <button id="msgSearchBtn" title="Search Messages"><i class="fas fa-search"></i></button>
+                            <button id="msgVoiceCall" title="Voice Call"><i class="fas fa-phone"></i></button>
+                            <button id="msgVideoCall" title="Video Call"><i class="fas fa-video"></i></button>
+                        </div>
+                    </header>
+                    <div id="msgSearchContainer" class="msg-search-container hidden">
+                        <input type="text" id="msgSearchInput" placeholder="Search in this chat...">
+                        <button id="closeMsgSearch"><i class="fas fa-times"></i></button>
+                    </div>
+
+                    <!-- Pinned Message Bar -->
+                    <div id="pinnedMsgHeader" class="pinned-msg-header hidden">
+                        <i class="fas fa-thumbtack"></i>
+                        <span id="pinnedMsgText" style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Pinned message...</span>
+                        <button id="unpinBtn" style="background:none; border:none; color:var(--text-muted); cursor:pointer;"><i class="fas fa-times"></i></button>
+                    </div>
+
+                    <div class="messages-wrap" id="messagesWrap">
+                        <!-- Messages span here -->
+                    </div>
+
+                    <!-- Scroll to Bottom Button -->
+                    <button id="scrollBottomBtn" class="scroll-bottom-btn hidden" title="Scroll to bottom">
+                        <i class="fas fa-chevron-down"></i>
+                    </button>
+
+                    <!-- Emoji Picker Wrapper -->
+                    <div id="emojiPickerWrapper" class="emoji-wrapper hidden">
+                        <emoji-picker id="advancedEmojiPicker"></emoji-picker>
+                    </div>
+
+                    <!-- Media Upload Preview -->
+                    <div id="mediaPreview" class="media-preview hidden">
+                        <div class="preview-content">
+                            <i class="fas fa-file-image"></i>
+                            <span id="previewName">file.jpg</span>
+                        </div>
+                        <button id="cancelMediaBtn"><i class="fas fa-times"></i></button>
+                    </div>
+                    <!-- Reply Preview Wrapper -->
+                    <div id="replyPreviewContainer" class="reply-preview-container hidden">
+                        <div class="reply-preview-content">
+                            <div class="reply-preview-name" id="replyPreviewName">Name</div>
+                            <div class="reply-preview-text" id="replyPreviewText">Message preview</div>
+                        </div>
+                        <button id="cancelReplyBtn" class="cancel-reply-btn"><i class="fas fa-times"></i></button>
+                    </div>
+
+                    <footer class="chat-input-area">
+                        <div class="attachment-menu-wrap">
+                            <input type="file" id="fileUpload" class="hidden" accept="image/*,video/*,audio/*,.pdf,.doc,.docx">
+                            <button id="attachBtn" title="Attach / Mini Apps"><i class="fas fa-plus"></i></button>
+                            <!-- Rich Attachment Dropdown -->
+                            <div id="attachDropdown" class="attach-dropdown hidden">
+                                <div class="attach-option" data-action="file"><i class="fas fa-paperclip"></i> File</div>
+                                <div class="attach-option" data-action="poll"><i class="fas fa-poll"></i> Poll</div>
+                                <div class="attach-option" data-action="location"><i class="fas fa-map-marker-alt"></i> Location</div>
+                                <div class="attach-option" data-action="games"><i class="fas fa-gamepad"></i> Games Hub</div>
+                                <div class="attach-option" data-action="schedule"><i class="fas fa-clock"></i> Schedule</div>
+                            </div>
+                        </div>
+                        
+                        <button id="emojiBtn" title="Emojis"><i class="far fa-smile"></i></button>
+                        
+                        <textarea id="messageInput" placeholder="Type a message..." rows="1"></textarea>
+                        
+                        <button id="recordBtn" class="record-btn" title="Voice Message"><i class="fas fa-microphone"></i></button>
+                        <div id="recordingInfo" class="recording-info">
+                            <button id="cancelRecordBtn" class="voice-ui-btn trash" title="Discard"><i class="fas fa-trash-alt"></i></button>
+                            <div class="voice-ui-timer-wrap">
+                                <div class="recording-dot"></div>
+                                <span id="recordingTimer">0:00</span>
+                            </div>
+                            <div class="voice-ui-waveform">
+                                <div class="waveform-dot-line"></div>
+                            </div>
+                            <button class="voice-ui-btn stop" onclick="nexChat.stopRecording()" title="Pause/Stop"><i class="fas fa-pause"></i></button>
+                            <button class="voice-ui-btn disappear" title="Disappearing Timer"><i class="fas fa-history"></i></button>
+                            <button class="voice-ui-send-btn" onclick="nexChat.stopRecording()" title="Send"><i class="fas fa-paper-plane"></i></button>
+                        </div>
+                    <button id="sendBtn" class="btn-icon primary hidden"><i class="fas fa-paper-plane"></i></button>
+                    </footer>
+                </div>
+            </main>
+            <div class="sidebar-resizer info-resizer" id="infoResizer"></div>
+
+            <!-- Contact Info Panel (Right) -->
+            <aside class="contact-info-panel hidden" id="contactInfoPanel">
+                <header class="info-panel-header">
+                    <button id="closeInfoPanel"><i class="fas fa-times"></i></button>
+                    <h3 id="panelTitle">Contact Info</h3>
+                </header>
+                <div class="info-panel-body">
+                    <div class="info-header-content">
+                        <img id="infoAvatar" src="" alt="Avatar" class="info-avatar-large">
+                        <h2 id="infoName">User</h2>
+                        <div id="infoStatus" class="info-status" style="margin-bottom:15px; display:inline-block;">Offline</div>
+                        
+                        <!-- Main Actions Row -->
+                        <div class="info-actions-row">
+                            <button class="info-action-card" onclick="nexChat.initiateCall('voice')"><i class="fas fa-phone-alt"></i><span>Voice</span></button>
+                            <button class="info-action-card" onclick="nexChat.initiateCall('video')"><i class="fas fa-video"></i><span>Video</span></button>
+                            <button class="info-action-card" id="infoSearchBtn"><i class="fas fa-search"></i><span>Search</span></button>
+                        </div>
+                    </div>
+
+                    <div class="info-section">
+                        <h4 class="section-label">About</h4>
+                        <p id="infoAbout" class="info-text-large">Hey there! I am using NexChat.</p>
+                    </div>
+
+                    <div class="info-list-group">
+                        <div class="info-list-item collapsible-header" onclick="nexChat.toggleMediaCollapseFromHeader(this)">
+                            <div style="display:flex; justify-content:space-between; width:100%; align-items:center;">
+                                <span><i class="fas fa-image" style="color:var(--text-muted); margin-right:10px;"></i> Media, links and docs</span>
+                                <div style="display:flex; align-items:center; gap:10px;">
+                                    <span class="text-muted" id="infoMediaCount" style="font-size:0.8rem;">0</span>
+                                    <i class="fas fa-chevron-down toggle-arrow"></i>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="mediaCollapsibleBody" class="media-collapsible-body">
+                            <div id="infoSharedMedia" class="shared-media-grid">
+                                <p class="text-muted" style="grid-column: 1/-1; font-size:0.8rem; text-align:center; padding: 20px 0;">No media shared yet.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="info-list-group">
+                        <div class="info-list-item clickable" id="infoStarredMsgs">
+                            <i class="fas fa-star list-icon" style="color:#eab308"></i>
+                            <div class="list-content">
+                                <span>Starred Messages</span>
+                            </div>
+                            <i class="fas fa-chevron-right text-muted" style="font-size:0.8rem;"></i>
+                        </div>
+                        <div class="info-list-item clickable" onclick="nexChat.toggleFavoriteFromInfo()">
+                            <i class="far fa-heart list-icon" id="infoFavoriteIcon"></i>
+                            <span id="infoFavoriteText">Add to Favourites</span>
+                        </div>
+                    </div>
+
+                    <div class="info-list-group">
+                        <div class="info-list-item clickable danger-text" onclick="nexChat.confirmClearChat()">
+                            <i class="fas fa-minus-circle list-icon"></i>
+                            <span>Clear Chat</span>
+                        </div>
+                        <div class="info-list-item clickable danger-text" onclick="nexChat.toggleBlockUser()">
+                            <i class="fas fa-ban list-icon"></i>
+                            <span id="infoBlockText">Block Contact</span>
+                        </div>
+                    </div>
+                    
+                </div>
+            </aside>
+
+        <!-- Mobile Bottom Navigation Bar -->
+        <nav class="mobile-bottom-nav" id="mobileBottomNav">
+            <button class="mobile-nav-item active" id="mobileNavChats" onclick="nexChat.switchMobileTab('chats', this)">
+                <i class="fas fa-comment-dots"></i>
+                <span>Chats</span>
+            </button>
+            <button class="mobile-nav-item" id="mobileNavCalls" onclick="nexChat.switchMobileTab('calls', this)">
+                <i class="fas fa-phone-alt"></i>
+                <span>Calls</span>
+            </button>
+            <button class="mobile-nav-item" id="mobileNavProfile" onclick="nexChat.openProfileSettings()">
+                <i class="fas fa-user"></i>
+                <span>Profile</span>
+            </button>
+        </nav>
+
+        </div>
+    </div>
+
+    <!-- Games Selection Modal -->
+    <div id="gamesModal" class="modal-overlay hidden">
+        <div class="modal-glass">
+            <div class="modal-header">
+                <h3><i class="fas fa-gamepad" style="color:var(--accent)"></i> NexChat Games Hub</h3>
+                <button class="modal-close" onclick="nexChat.closeModal('gamesModal')"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <div class="games-grid">
+                    <div class="game-card" onclick="nexChat.startMiniGame('tictactoe')">
+                        <div class="game-icon"><i class="fas fa-th-large"></i></div>
+                        <h4>Tic-Tac-Toe</h4>
+                    </div>
+                    <div class="game-card" onclick="nexChat.startMiniGame('rock_paper_scissors')">
+                        <div class="game-icon"><i class="fas fa-hand-fist"></i></div>
+                        <h4>Rock Paper Scissors</h4>
+                    </div>
+                    <div class="game-card" onclick="nexChat.startMiniGame('guess_number')">
+                        <div class="game-icon"><i class="fas fa-hashtag"></i></div>
+                        <h4>Guess the Number</h4>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI Summary Modal -->
+    <div id="summaryModal" class="modal-overlay hidden">
+        <div class="modal-glass">
+            <div class="modal-header">
+                <h3><i class="fas fa-wand-magic-sparkles summarize-sparkle"></i> AI Chat Summary</h3>
+                <button class="modal-close" onclick="nexChat.closeModal('summaryModal')"><i class="fas fa-times"></i></button>
+            </div>
+            <div id="summaryBody" class="modal-body">
+                <div class="summary-loading"><div class="spinner"></div><span>✨ Summarizing conversation...</span></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Message Info Modal -->
+    <div id="msgInfoModal" class="modal-overlay hidden">
+        <div class="modal-glass modal-sm">
+            <div class="modal-header">
+                <h3><i class="fas fa-info-circle" style="color:var(--accent)"></i> Message Info</h3>
+                <button class="modal-close" onclick="nexChat.closeModal('msgInfoModal')"><i class="fas fa-times"></i></button>
+            </div>
+            <div id="msgInfoBody" class="modal-body">
+                <!-- Populated dynamically -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Poll Creator Modal -->
+    <div id="pollModal" class="modal-overlay hidden">
+        <div class="modal-glass modal-sm">
+            <div class="modal-header">
+                <h3><i class="fas fa-poll" style="color:var(--accent)"></i> Create Poll</h3>
+                <button class="modal-close" onclick="nexChat.closeModal('pollModal')"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <div class="input-group-modal">
+                    <label>Question</label>
+                    <input type="text" id="pollQuestion" placeholder="Ask something...">
+                </div>
+                <div id="pollOptionsContainer">
+                    <div class="input-group-modal">
+                        <label>Option 1</label>
+                        <input type="text" class="poll-option-input" placeholder="Option 1">
+                    </div>
+                    <div class="input-group-modal">
+                        <label>Option 2</label>
+                        <input type="text" class="poll-option-input" placeholder="Option 2">
+                    </div>
+                </div>
+                <button class="btn-secondary w-full" onclick="nexChat.addPollOption()" style="margin-bottom:10px;"><i class="fas fa-plus"></i> Add Option</button>
+                <button class="btn-primary w-full" onclick="nexChat.sendPoll()">Send Poll</button>
+            </div>
+        </div>
+    </div>
+
+
+
+    <!-- Schedule Message Modal -->
+    <!-- Schedule Call Modal (Image 2 Match) --    <!-- Schedule Call Modal -->
+    <div id="scheduleCallModal" class="modal-overlay hidden">
+        <div class="modal-glass modal-md">
+            <div class="modal-header">
+                <h3><i class="fas fa-calendar-alt" style="color:var(--accent)"></i> Schedule Call</h3>
+                <button class="modal-close" onclick="nexChat.closeModal('scheduleCallModal')"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <div class="input-group-modal">
+                    <label>Event Name</label>
+                    <input type="text" id="scheduleCallTitle" placeholder="e.g. Weekly Sync">
+                </div>
+                <div class="input-group-modal">
+                    <label>Description (Optional)</label>
+                    <textarea id="scheduleCallDesc" placeholder="What's this call about?" rows="2"></textarea>
+                </div>
+                
+                <div style="display:flex; gap:15px; margin-bottom:20px;">
+                    <div class="input-group-modal" style="flex:1;">
+                        <label>Date</label>
+                        <input type="date" id="scheduleStartDate">
+                    </div>
+                    <div class="input-group-modal" style="flex:1;">
+                        <label>Start Time</label>
+                        <input type="time" id="scheduleStartTime">
+                    </div>
+                </div>
+
+                <div style="display:flex; gap:15px;">
+                    <div class="input-group-modal" style="flex:1;">
+                        <label>Call Type</label>
+                        <select id="scheduleCallType">
+                            <option value="video">Video Call</option>
+                            <option value="audio">Audio Call</option>
+                        </select>
+                    </div>
+                    <div class="input-group-modal" style="flex:1;">
+                        <label>Reminder</label>
+                        <select id="scheduleCallReminder">
+                            <option value="15">15 minutes before</option>
+                            <option value="10">10 minutes before</option>
+                            <option value="5">5 minutes before</option>
+                        </select>
+                    </div>
+                </div>
+
+                <button class="btn-primary w-full" onclick="nexChat.sendScheduledCall()" style="margin-top:10px;">Schedule Call</button>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- My Profile Modal Removed -->
+
+    <!-- Context Menu -->
+    <div id="contextMenu" class="context-menu hidden"></div>
+
+    <!-- Lightbox -->
+    <div id="lightbox" class="lightbox hidden">
+        <span class="lightbox-close">&times;</span>
+        <img class="lightbox-content" id="lightboxImg">
+    </div>
+
+    <!-- Starred Messages Modal -->
+    <div id="starredModal" class="modal-overlay hidden">
+        <div class="modal-glass modal-md">
+            <div class="modal-header">
+                <h3><i class="fas fa-star" style="color:#eab308"></i> Starred Messages</h3>
+                <button class="modal-close" onclick="nexChat.closeModal('starredModal')"><i class="fas fa-times"></i></button>
+            </div>
+            <div id="starredList" class="modal-body scrollable" style="max-height:60vh; overflow-y:auto;">
+                <!-- Starred messages loaded here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div id="deleteConfirmModal" class="modal-overlay hidden">
+        <div class="modal-glass modal-sm">
+            <div class="modal-header">
+                <h3 style="color:var(--danger)"><i class="fas fa-exclamation-triangle"></i> Delete Message?</h3>
+                <button class="modal-close" onclick="nexChat.closeDeleteModal()"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted" style="margin-bottom:20px; font-size: 0.9rem;">Are you sure you want to delete this message for everyone? This action cannot be undone.</p>
+                <div style="display:flex; gap:10px;">
+                    <button class="btn-secondary flex-1" onclick="nexChat.closeDeleteModal()">Cancel</button>
+                    <button class="btn-primary flex-1" style="background:var(--danger);" onclick="nexChat.confirmDelete()">Delete</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Forward Modal -->
+    <div id="forwardModal" class="modal-overlay hidden">
+        <div class="modal-glass modal-sm">
+            <div class="modal-header">
+                <h3><i class="fas fa-share" style="color:var(--accent)"></i> Forward to...</h3>
+                <button class="modal-close" onclick="nexChat.closeModal('forwardModal')"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <div class="search-box" style="margin-bottom:15px; border-radius:12px; background:var(--bg-input);">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="forwardSearch" placeholder="Search contacts...">
+                </div>
+                <div id="forwardContactsList" class="contacts-list" style="max-height:40vh; overflow-y:auto;">
+                    <!-- Contacts loaded here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Forgot Password Modal -->
+    <div id="forgotPasswordModal" class="modal-overlay hidden">
+        <div class="modal-glass modal-sm">
+            <div class="modal-header">
+                <h3><i class="fas fa-key" style="color:var(--accent)"></i> Reset Password</h3>
+                <button class="modal-close" onclick="nexChat.closeModal('forgotPasswordModal')"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted" style="margin-bottom:20px; font-size: 0.85rem;">Enter your email address and we'll send you a link to reset your password.</p>
+                <div class="input-group-modal">
+                    <label>Email Address</label>
+                    <input type="email" id="forgotEmail" placeholder="Enter your email">
+                </div>
+                <button class="btn-primary w-full" onclick="nexChat.handleForgotPassword()">Send Reset Link</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Profile Settings Modal -->
+    <div id="settingsModal" class="modal-overlay hidden">
+        <div class="modal-glass modal-sm">
+            <div class="modal-header">
+                <h3><i class="fas fa-user-circle" style="color:var(--accent)"></i> My Profile</h3>
+                <button class="modal-close" onclick="nexChat.closeModal('settingsModal')"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <div style="display:flex; justify-content:center; margin-bottom:15px;">
+                    <div class="settings-avatar-wrapper">
+                        <img id="settingsAvatarPreview" src="https://ui-avatars.com/api/?name=User&background=random" alt="Avatar">
+                        <label for="settingsAvatarUpload" class="avatar-edit-btn"><i class="fas fa-camera"></i></label>
+                        <input type="file" id="settingsAvatarUpload" class="hidden" accept="image/*" onchange="nexChat.previewAvatar(this)">
+                    </div>
+                </div>
+
+                <div class="profile-field-group">
+                    <label class="profile-field-label">Display Name</label>
+                    <input type="text" id="settingsUsername" class="profile-input" placeholder="Your username">
+                </div>
+
+                <div class="profile-field-group">
+                    <label class="profile-field-label">Avatar URL (Optional)</label>
+                    <input type="text" id="settingsAvatarUrl" class="profile-input" placeholder="https://example.com/avatar.png" oninput="nexChat.previewAvatarUrl(this.value)">
+                </div>
+
+                <div class="profile-field-group">
+                    <label class="profile-field-label">About</label>
+                    <textarea id="settingsAbout" class="profile-input" placeholder="Tell us about yourself..." style="min-height:80px; resize:none;"></textarea>
+                </div>
+
+                <button class="btn-primary w-full" onclick="nexChat.saveSettings()" style="margin-top:10px; height:45px; font-weight:600;">Save Profile</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Calling UI -->
+    <div id="incomingCallOverlay" class="call-overlay hidden">
+        <div class="call-card incoming">
+            <div class="call-user-info">
+                <div class="caller-avatar-container">
+                    <img id="incomingCallerAvatar" src="" alt="Avatar">
+                    <div class="avatar-pulse"></div>
+                </div>
+                <h3 id="incomingCallerName">Incoming...</h3>
+                <p id="incomingCallType">Voice Call</p>
+            </div>
+            <div class="call-actions">
+                <button class="btn-call accept" id="acceptCallBtn"><i class="fas fa-phone-alt"></i></button>
+                <button class="btn-call reject" id="rejectCallBtn"><i class="fas fa-phone-slash"></i></button>
+            </div>
+        </div>
+    </div>
+
+    <div id="activeCallOverlay" class="call-overlay full hidden">
+        <div class="video-grid">
+            <video id="remoteVideo" autoplay playsinline class="remote-video"></video>
+            <video id="localVideo" autoplay playsinline muted class="local-video"></video>
+        </div>
+        <div class="call-controls">
+            <div class="call-info-min">
+                <h3 id="activeCallName">User Name</h3>
+                <span id="callDuration">00:00</span>
+            </div>
+            <div class="call-avatars-grid" id="callAvatarsGrid">
+                <div class="remote-avatar-container">
+                    <img id="remoteCallAvatar" src="" class="call-avatar-img" alt="Partner">
+                    <div class="avatar-ring"></div>
+                </div>
+            </div>
+            <div class="control-btns">
+                <button class="control-btn" id="toggleMuteBtn" title="Mute/Unmute"><i class="fas fa-microphone"></i></button>
+                <button class="control-btn" id="toggleVideoBtn" title="Camera On/Off"><i class="fas fa-video"></i></button>
+                <button class="control-btn" onclick="nexChat.minimizeCall()" title="Minimize"><i class="fas fa-compress-alt"></i></button>
+                <button class="control-btn reject" id="endCallBtn" title="Hang Up"><i class="fas fa-phone-slash"></i></button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Schedule Message Modal -->
+    <div id="scheduleMsgModal" class="modal-overlay hidden">
+        <div class="modal-glass modal-sm">
+            <div class="modal-header">
+                <h3><i class="fas fa-calendar-plus" style="color:var(--accent)"></i> Schedule Item</h3>
+                <button class="modal-close" onclick="nexChat.closeModal('scheduleMsgModal')"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <div class="input-group-modal">
+                    <label>Type</label>
+                    <select id="scheduleType">
+                        <option value="text">Message</option>
+                        <option value="call">Call</option>
+                    </select>
+                </div>
+                <div class="input-group-modal">
+                    <label>Date & Time</label>
+                    <input type="datetime-local" id="scheduleTime">
+                </div>
+                <div class="input-group-modal" id="scheduleMessageRow">
+                    <label>Message (Optional)</label>
+                    <textarea id="scheduleMessageText" rows="3"></textarea>
+                </div>
+                <div style="display:flex; gap:10px;">
+                    <button class="btn-secondary flex-1" onclick="nexChat.closeModal('scheduleMsgModal')">Cancel</button>
+                    <button class="btn-primary flex-1" onclick="nexChat.handleSchedule()">Schedule</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Call Link Modal -->
+    <div id="callLinkModal" class="modal-overlay hidden">
+        <div class="modal-glass modal-sm">
+            <div class="modal-header">
+                <h3><i class="fas fa-link" style="color:var(--accent)"></i> Call Link</h3>
+                <button class="modal-close" onclick="nexChat.closeModal('callLinkModal')"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted" style="margin-bottom:20px; font-size:0.85rem;">Share this link with anyone you want to join your call room.</p>
+                <div class="input-group-modal">
+                    <input type="text" id="generatedCallLink" readonly>
+                </div>
+                <button class="btn-primary w-full" onclick="nexChat.copyCallLink()">Copy Link</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- New Call Contact Selector Modal -->
+    <div id="newCallModal" class="modal-overlay hidden">
+        <div class="modal-glass modal-sm">
+            <div class="modal-header">
+                <h3><i class="fas fa-phone-alt" style="color:var(--accent)"></i> Start New Call</h3>
+                <button class="modal-close" onclick="nexChat.closeModal('newCallModal')"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <div class="search-box" style="margin-bottom:20px; border-radius:12px; background:var(--bg-input);">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="callSearchInput" placeholder="Search contacts..." oninput="nexChat.filterCallContacts(this.value)">
+                </div>
+                <div id="callContactsList" class="contacts-list" style="max-height:380px; overflow-y:auto;">
+                    <!-- Call options load here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
